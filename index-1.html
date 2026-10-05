@@ -1,0 +1,105 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>GTPL Cable Manager</title>
+<style>
+:root{--bg:#f3f5fa;--c:#fff;--t:#1b2333;--m:#64708a;--b:#dde3ee;--p:#2455d6;--g:#15803d;--o:#c2610c;--r:#dc2626;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1420;--c:#182030;--t:#e8edf7;--m:#98a3bd;--b:#2a3550;--p:#6f93ff;--g:#4ade80;--o:#fb923c;--r:#f87171}}
+:root[data-theme="dark"]{--bg:#0f1420;--c:#182030;--t:#e8edf7;--m:#98a3bd;--b:#2a3550;--p:#6f93ff;--g:#4ade80;--o:#fb923c;--r:#f87171}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--t);font:15px system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background-color:var(--bg)}
+header{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;flex-wrap:wrap;gap:6px}h1{font-size:20px;margin:0}#sync{font-size:12px;color:var(--m)}
+nav,.subs,.chips{display:flex;gap:6px;overflow-x:auto;padding:0 14px 8px}main{padding:0 14px 30px;max-width:1000px;margin:auto}
+.tab,.chip{white-space:nowrap;background:var(--c);color:var(--t);border:1px solid var(--b);padding:9px 13px;border-radius:20px;font-size:14px;cursor:pointer}.tab.on,.chip.on{background:var(--p);color:#fff;border-color:var(--p)}
+.tab i{background:var(--r);color:#fff;border-radius:10px;font-style:normal;font-size:11px;padding:1px 6px;margin-left:5px}
+.card{background:var(--c);border:1px solid var(--b);border-radius:12px;padding:12px;margin:0 0 12px}.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:12px}.cards .card{margin:0}
+h2{margin:4px 0 0;font-size:24px}small,.m{color:var(--m)}.g{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:8px;margin:8px 0}
+label{display:block;font-size:12px;color:var(--m)}input,select{width:100%;padding:10px;margin-top:3px;border:1px solid var(--b);border-radius:8px;background:var(--bg);color:var(--t);font-size:15px}
+button{background:var(--p);color:#fff;border:0;padding:9px 13px;border-radius:8px;font-size:14px;cursor:pointer}button.x{background:var(--bg);color:var(--t);border:1px solid var(--b)}button.red{color:var(--r)}
+.w{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:14px}th,td{text-align:left;padding:8px 6px;border-bottom:1px solid var(--b);vertical-align:top}th{color:var(--m);font-size:12px}
+.ac{white-space:nowrap}.ac button{margin-right:4px}.lk{cursor:pointer;color:var(--p)}tr.tot td{font-weight:700;border-top:2px solid var(--t)}tr.sm td{color:var(--m);font-size:13px}
+.bd{padding:3px 8px;border-radius:10px;font-size:12px;font-weight:600;white-space:nowrap;border:1px solid currentColor}.bd.ok{color:var(--g)}.bd.soon{color:var(--o)}.bd.exp{color:var(--r)}
+dialog{border:1px solid var(--b);border-radius:12px;background:var(--c);color:var(--t);width:min(340px,92vw)}.row{display:flex;gap:8px;justify-content:flex-end;margin-top:12px}
+</style></head><body>
+<header><h1>📺 GTPL Cable Manager</h1><span><span id="sync">Saved on this device</span> <button class="x" id="so" style="display:none;margin-left:6px" onclick="firebase.auth().signOut()">Sign out</button></span></header><nav id="nav"></nav><main id="app"></main>
+<dialog id="D"><h3 id="Dt" style="margin-top:0"></h3><label>Amount ₹<input id="ra" type="number" min="0"></label><label>Renewal date<input id="rd" type="date"></label><label>Duration (days)<input id="rx" type="number" min="1"></label><div class="row"><button class="x" onclick="D.close()">Cancel</button><button onclick="doRn()">Renew</button></div></dialog>
+<script src="https://cdn.jsdelivr.net/npm/firebase@10.12.2/firebase-app-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/firebase@10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/firebase@10.12.2/firebase-auth-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+const CFG={apiKey:"AIzaSyCUSRQ5OiPfPkYpAZ_sfz0FdxmKlRIhu68",authDomain:"gtpl-cable-manager.firebaseapp.com",projectId:"gtpl-cable-manager",storageBucket:"gtpl-cable-manager.firebasestorage.app",messagingSenderId:"41999045489",appId:"1:41999045489:web:ea79437d9c6cd2a78f9cd0",measurementId:"G-YT5RGYQMEQ"};
+const TV=['Ranaghat','Habibpur','Nandighat'],LK='gtpl_cable_v1';
+const $=s=>document.querySelector(s),esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pad=n=>String(n).padStart(2,'0'),ymd=d=>d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()),T=()=>ymd(new Date());
+const U=s=>{const[y,m,d]=s.split('-').map(Number);return Date.UTC(y,m-1,d)};
+const add=(s,n)=>{const[y,m,d]=s.split('-').map(Number);return ymd(new Date(y,m-1,d+n))},diff=(a,b)=>Math.round((U(b)-U(a))/864e5);
+const money=n=>'₹'+Number(n||0).toLocaleString('en-IN'),dm=s=>s.split('-').reverse().join('-'),st=t=>{const e=$('#sync');if(e)e.textContent=t};
+let P=[],BA=['Ranaghat','Nandighat'],view='dash',sub='all',bba='all',q='',qd='',F=T(),To=T(),RID=null,db=null;
+try{const x=JSON.parse(localStorage.getItem(LK)||'{}');P=x.P||[];BA=x.BA||BA}catch(e){}
+const cache=()=>{try{localStorage.setItem(LK,JSON.stringify({P,BA}))}catch(e){}};
+const save=p=>{cache();if(db)db.collection('persons').doc(p.id).set(p).catch(()=>st('Offline – saved on this device'))};
+const saveCfg=()=>{cache();if(db)db.collection('meta').doc('cfg').set({BA}).catch(()=>{})};
+const OWNER=['sdsudip65@gmail.com','ujaan.das143@gmail.com']; /* father's Gmail address(es), lowercase, e.g. ['name@gmail.com'] */
+let unsub=[],LM='',AUTHON=false;
+function loginView(m){$('#nav').innerHTML='';$('#app').innerHTML=`<div class="card" style="text-align:center;max-width:380px;margin:40px auto"><h2>📺 GTPL Cable Manager</h2><p class="m">Please sign in to continue</p><button onclick="signIn()">Sign in with Google</button><p style="color:var(--r)">${esc(m||'')}</p></div>`}
+function signIn(){const a=firebase.auth(),pr=new firebase.auth.GoogleAuthProvider();a.signInWithPopup(pr).catch(e=>{if(e.code==='auth/popup-blocked'||e.code==='auth/operation-not-supported-in-this-environment')a.signInWithRedirect(pr);else if(e.code!=='auth/popup-closed-by-user'&&e.code!=='auth/cancelled-popup-request')loginView('Sign-in failed ('+e.code+')')})}
+function startDb(){db=firebase.firestore();unsub=[
+db.collection('persons').onSnapshot(s=>{if(s.empty&&P.length)P.forEach(save);else{P=s.docs.map(d=>d.data());cache();render()}st('☁ Cloud synced')},()=>st('Offline – saved on this device')),
+db.collection('meta').doc('cfg').onSnapshot(d=>{if(d.exists&&Array.isArray(d.data().BA)){BA=d.data().BA;cache();render()}},()=>{})]}
+try{if(window.firebase&&firebase.auth){firebase.initializeApp(CFG);AUTHON=true;
+firebase.auth().onAuthStateChanged(u=>{unsub.forEach(f=>f());unsub=[];db=null;
+if(!u){$('#so').style.display='none';st('Not signed in');const m=LM;LM='';return loginView(m)}
+if(OWNER.length&&!OWNER.includes((u.email||'').toLowerCase())){LM='This Google account is not allowed.';return firebase.auth().signOut()}
+$('#so').style.display='';st('Signed in as '+(u.email||''));startDb();render()})}}catch(e){AUTHON=false;db=null}
+const live=()=>P.filter(p=>!p.del),last=p=>p.pay[p.pay.length-1],left=p=>diff(T(),p.exp);
+const stat=p=>{const l=left(p);return l<0?'exp':l<=2?'soon':'ok'},chn=p=>p.t==='bb'?'Broadband':p.a;
+const badge=p=>{const l=left(p),s=stat(p);return `<span class="bd ${s}">${s==='exp'?'Expired '+(-l)+'d ago':l===0?'Expires today':s==='soon'?'In '+l+' day'+(l>1?'s':''):l+' days left'}</span>`};
+const base=()=>live().filter(p=>view==='bb'?p.t==='bb'&&(bba==='all'||p.a===bba):p.t==='tv'&&p.a===view);
+const cnt=k=>live().filter(p=>(k==='bb'?p.t==='bb':p.t==='tv'&&p.a===k)&&stat(p)!=='ok').length;
+function go(v){view=v;sub='all';q='';qd='';render()}
+function render(){
+const tabs=[['dash','📊 Dashboard'],...TV.map(a=>[a,a]),['bb','🌐 Broadband']];
+$('#nav').innerHTML=tabs.map(([k,l])=>{const n=k==='dash'?0:cnt(k);return `<button class="tab ${view===k?'on':''}" onclick="go('${k}')">${l}${n?`<i>${n}</i>`:''}</button>`}).join('');
+view==='dash'?dash():area()}
+function area(){const bb=view==='bb';
+$('#app').innerHTML=`<div class="card"><b>${bb?'New broadband connection':'New TV package – '+view}</b><div class="g">
+${bb?`<label>Area<select id="i_b">${BA.map(a=>`<option ${a===bba?'selected':''}>${esc(a)}</option>`).join('')}</select></label>`:''}
+<label>Name *<input id="i_n"></label><label>Phone (optional)<input id="i_p" inputmode="tel"></label><label>Date given<input id="i_d" type="date" value="${T()}"></label><label>Amount ₹ *<input id="i_a" type="number" min="0" inputmode="numeric"></label><label>Duration (days)<input id="i_x" type="number" min="1" value="30"></label></div><button onclick="addP()">＋ Add</button></div>
+${bb?`<div class="chips"><button class="chip ${bba==='all'?'on':''}" onclick="setA(-1)">All areas</button>${BA.map((a,i)=>`<button class="chip ${bba===a?'on':''}" onclick="setA(${i})">${esc(a)}</button>`).join('')}<button class="chip" onclick="newA()">＋ Add area</button></div>`:''}
+<div class="card"><div class="g"><label>Search name (first letter / surname) or phone<input id="sq" value="${esc(q)}" oninput="q=this.value.trim();list()"></label><label>Search by date<input id="sd" type="date" value="${qd}" onchange="qd=this.value;list()"></label></div></div><div id="lst"></div>`;list()}
+function setA(i){bba=i<0?'all':BA[i];sub='all';render()}
+function newA(){const n=(prompt('New broadband area name')||'').trim();if(!n)return;if(BA.some(a=>a.toLowerCase()===n.toLowerCase()))return alert('Area already exists');BA.push(n);saveCfg();render()}
+function addP(){const bb=view==='bb',n=$('#i_n').value.trim(),av=$('#i_a').value,d=$('#i_d').value||T(),ds=+$('#i_x').value;
+if(!n)return alert('Please enter the name');if(av===''||isNaN(+av)||+av<0)return alert('Please enter the amount');if(!(ds>0))return alert('Please enter duration in days');
+if(bb&&!$('#i_b').value)return alert('Add a broadband area first');
+const p={id:Date.now().toString(36)+Math.random().toString(36).slice(2,6),t:bb?'bb':'tv',a:bb?$('#i_b').value:view,n,ph:$('#i_p').value.trim(),days:ds,exp:add(d,ds),del:false,pay:[{d,a:+av,n:ds}]};
+P.push(p);save(p);render()}
+function list(){const b=base(),c=s=>b.filter(p=>stat(p)===s).length;let a=b.filter(p=>sub==='all'||stat(p)===sub);
+if(q){const s=q.toLowerCase();a=a.filter(p=>p.n.toLowerCase().split(/\s+/).some(w=>w.startsWith(s))||(p.ph||'').includes(q))}
+if(qd)a=a.filter(p=>p.pay.some(x=>x.d===qd));
+a.sort((x,y)=>sub==='all'?last(y).d.localeCompare(last(x).d):x.exp.localeCompare(y.exp));
+const S=[['all','All',b.length],['soon','Expiring (0-2 days)',c('soon')],['exp','Expired',c('exp')]],bb=view==='bb';
+$('#lst').innerHTML=`<div class="subs" style="padding:0 0 8px">${S.map(([k,l,n])=>`<button class="tab ${sub===k?'on':''}" onclick="sub='${k}';list()">${l} (${n})</button>`).join('')}</div>`+
+(a.length?`<div class="card w"><table><tr><th>Name</th><th>Last paid</th><th>Expiry</th><th>Status</th><th></th></tr>${a.map(p=>{const l=last(p);return `<tr><td><b class="lk" onclick="hist('${p.id}')">${esc(p.n)}</b><br><small>${esc(p.ph)||'no phone'}${bb?' · '+esc(p.a):''}</small></td><td>${dm(l.d)}<br><b>${money(l.a)}</b></td><td>${dm(p.exp)}</td><td>${badge(p)}</td><td class="ac"><button onclick="rn('${p.id}')">Renew</button><button class="x" onclick="ed('${p.id}')">✎</button><button class="x red" onclick="rm('${p.id}')">🗑</button></td></tr>`}).join('')}</table></div>`:'<p class="m">No records found.</p>')}
+const get=id=>P.find(x=>x.id===id);
+function hist(id){const p=get(id);alert(p.n+(p.ph?' ('+p.ph+')':'')+'\nPayment history:\n'+p.pay.map(x=>dm(x.d)+'  '+money(x.a)+'  '+x.n+' days').join('\n')+'\nTotal: '+money(p.pay.reduce((s,x)=>s+x.a,0)))}
+function rn(id){RID=id;const p=get(id);$('#Dt').textContent='Renew – '+p.n;$('#ra').value=last(p).a;$('#rd').value=T();$('#rx').value=p.days;D.showModal()}
+function doRn(){const p=get(RID),a=$('#ra').value,d=$('#rd').value,ds=+$('#rx').value;if(!p)return;
+if(a===''||isNaN(+a)||+a<0||!d||!(ds>0))return alert('Please fill amount, date and days');
+p.pay.push({d,a:+a,n:ds});p.days=ds;p.exp=add(p.exp>d?p.exp:d,ds);save(p);D.close();render()}
+function ed(id){const p=get(id),n=prompt('Name',p.n);if(n===null)return;const ph=prompt('Phone',p.ph||'');if(ph===null)return;if(!n.trim())return alert('Name cannot be empty');p.n=n.trim();p.ph=ph.trim();save(p);render()}
+function rm(id){const p=get(id);if(!confirm('Delete '+p.n+'?\nTheir payment history and earnings will stay in the revenue records.'))return;p.del=true;save(p);render()}
+const pays=()=>{const o=[];P.forEach(p=>p.pay.forEach(x=>o.push({d:x.d,a:x.a,n:x.n,c:chn(p),s:p.t==='bb'?p.a:'',nm:p.n,ph:p.ph||'',del:!!p.del})));return o};
+const sum=(A,f)=>A.filter(f).reduce((s,x)=>s+x.a,0);
+const defs=()=>[...TV.map(a=>({l:a,f:x=>x.c===a})),{l:'Broadband (all areas)',f:x=>x.c==='Broadband'},...BA.map(a=>({l:'↳ '+a,f:x=>x.c==='Broadband'&&x.s===a,k:'sm'})),{l:'GRAND TOTAL',f:()=>true,k:'tot'}];
+function dash(){const A=pays(),t=T(),m=t.slice(0,7),Pd=[x=>x.d===t,x=>x.d.slice(0,7)===m,()=>true];
+$('#app').innerHTML=`<div class="cards">${['Today','This month','All time'].map((l,i)=>`<div class="card"><small>${l} – total</small><h2>${money(sum(A,Pd[i]))}</h2></div>`).join('')}</div>
+<div class="card w"><b>Income by channel</b><table><tr><th></th><th>Today</th><th>This month</th><th>All time</th></tr>${defs().map(r=>`<tr class="${r.k||''}"><td>${esc(r.l)}</td>${Pd.map(f=>`<td>${money(sum(A,x=>r.f(x)&&f(x)))}</td>`).join('')}</tr>`).join('')}</table></div>
+<div class="card"><b>Date search &amp; records</b><div class="g"><label>From<input id="df" type="date" value="${F}" onchange="F=this.value;res()"></label><label>To<input id="dt2" type="date" value="${To}" onchange="To=this.value;res()"></label></div><button onclick="xl()">⬇ Download Excel</button><div id="res" class="w" style="margin-top:10px"></div></div>`;res()}
+function rng(){let f=F,t=To;if(f&&t&&f>t)[f,t]=[t,f];return pays().filter(x=>(!f||x.d>=f)&&(!t||x.d<=t)).sort((a,b)=>b.d.localeCompare(a.d))}
+function res(){const A=rng();$('#res').innerHTML=`<table><tr><th>Channel</th><th>Earned</th></tr>${defs().map(r=>`<tr class="${r.k||''}"><td>${esc(r.l)}</td><td>${money(sum(A,r.f))}</td></tr>`).join('')}</table><br>`+
+(A.length?`<table><tr><th>Date</th><th>Channel</th><th>Name</th><th>Amount</th></tr>${A.map(x=>`<tr><td>${dm(x.d)}</td><td>${esc(x.c)}${x.s?' – '+esc(x.s):''}</td><td>${esc(x.nm)}${x.del?' <small>(deleted)</small>':''}<br><small>${esc(x.ph)}</small></td><td>${money(x.a)}</td></tr>`).join('')}</table>`:'<p class="m">No payments in this range.</p>')}
+function xl(){if(!window.XLSX)return alert('Excel library not loaded. Please check the internet connection.');
+const pa=rng().map(x=>({Date:dm(x.d),Type:x.c==='Broadband'?'Broadband':'TV',Area:x.s||x.c,Name:x.nm,Phone:x.ph,Amount:x.a,Days:x.n,Deleted:x.del?'Yes':''}));
+const cu=P.map(p=>({Type:p.t==='bb'?'Broadband':'TV',Area:p.a,Name:p.n,Phone:p.ph||'','Last paid':dm(last(p).d),Expiry:dm(p.exp),Status:p.del?'Deleted':{ok:'Active',soon:'Expiring',exp:'Expired'}[stat(p)],'Total paid':p.pay.reduce((s,x)=>s+x.a,0)}));
+const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(pa),'Payments');XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(cu),'Customers');XLSX.writeFile(wb,'Cable_Records_'+T()+'.xlsx')}
+if(!AUTHON)render();
+</script></body></html>
